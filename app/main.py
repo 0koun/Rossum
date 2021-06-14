@@ -1,12 +1,8 @@
 import os
 import datetime
 import requests
+import xml.dom.minidom
 from flask import Flask, render_template, request
-from xml.etree import ElementTree
-
-#user = os.environ.get("ROSSUM_USER")
-#password = os.environ.get("ROSSUM_PASSWORD")
-
 
 app = Flask(__name__)
 
@@ -14,10 +10,10 @@ app = Flask(__name__)
 @app.route("/", methods=["POST", "GET"])
 def home():
     if request.method == "POST":
-        #print(request.form["input_annotation"])
         xml_data = download_data(request.form["input_annotation"])
-        #print(xml_data)
-        xml_restructure(xml_data)
+        info_dict, items = xml_separate_data(xml_data)
+        xml_template(info_dict, items)
+        send_data()
     return render_template("index.html")
 
 def download_data(annotation_id):
@@ -25,7 +21,6 @@ def download_data(annotation_id):
     username = os.environ.get("ROSSUM_USER")  # 'covave4442@flmcat.com'
     password = os.environ.get("ROSSUM_PASSWORD")  # 'rossum_test'
     endpoint = 'https://elis.rossum.ai/api/v1'
-    #endpoint = 'https://api.elis.rossum.ai/v1'
 
     data = {'username': username, 'password': password}
 
@@ -33,8 +28,6 @@ def download_data(annotation_id):
         f'{endpoint}/auth/login',
         json={'username': username, 'password': password}
     )
-    #print(response.headers)
-    #print(response.url)
     if not response.ok:
         print("Fail")
         raise ValueError(f'Failed to authorize: {response.status_code}')
@@ -52,19 +45,90 @@ def download_data(annotation_id):
     if not response.ok:
         raise ValueError(f'Failed to export: {response.status_code}')
 
-    #print(response.content)
     return response.content
 
-def xml_restructure(xml_data):
-    dom = ElementTree.fromstring(xml_data)
-    file_tree = ElementTree.ElementTree(dom)
-    file_tree.write("test_xml2.xml", encoding="utf-8")
-    '''results = dom.findall("results")
-    for r in results:
-        for i in r:
-            doc = i.find("document")
-            for d in doc:
-                print(d)'''
+def send_data():
+    username = ""
+    password = ""
+    queue_id = 12345
+    path = "test.xml"
+
+    url = "https://my-little-endpoint.ok/rossum" % str(queue_id)
+    with open(path, "rb") as f:
+        response = requests.post(
+            url,
+            files={"content": f},
+            auth=(username, password),
+        )
+    annotation_url = response.json()["results"][0]["annotation"]
+    if not response.ok:
+        print("cant send")
+    print("file send")
+    print("The file is reachable at the following URL:", annotation_url)
+
+def xml_separate_data(xml_data):
+    info_dict = {}
+    items = []
+    xml_parsed = xml.dom.minidom.parseString(xml_data)
+    xml_pretty = xml_parsed.toprettyxml()
+
+    section_array = xml_parsed.getElementsByTagName("section")
+    for section in section_array:
+        data_dict = {}
+        if section.getAttribute("schema_id"):
+            if section.getAttribute("schema_id") == "line_items_section":
+                items_data = section.getElementsByTagName("tuple")
+                for item in items_data:
+                    data_dict = {}
+                    datapoints = item.getElementsByTagName("datapoint")
+                    for datapoint in datapoints:
+                        if datapoint.firstChild:
+                            data_dict[datapoint.getAttribute("schema_id")] = datapoint.firstChild.nodeValue
+                    items.append(data_dict)
+            else:
+                datapoints = section.getElementsByTagName("datapoint")
+                for datapoint in datapoints:
+                    if datapoint.firstChild:
+                        data_dict[datapoint.getAttribute("schema_id")] = datapoint.firstChild.nodeValue
+                info_dict[section.getAttribute("schema_id")] = data_dict
+    return info_dict, items
+
+def xml_template(info_dict, items):
+    header = f'''<InvoiceRegisters>
+  <Invoices>
+    <Payable>
+      <InvoiceNumber>{info_dict["invoice_info_section"]["document_id"]}</InvoiceNumber>
+      <InvoiceDate>{info_dict["invoice_info_section"]["date_issue"]}T00:00:00</InvoiceDate>
+      <DueDate>{info_dict["invoice_info_section"]["date_issue"]}T00:00:00</DueDate>
+      <TotalAmount>{float(info_dict["amounts_section"]["amount_total_tax"])*1.04246925755848}</TotalAmount>
+      <Notes/>
+      <Iban>{info_dict["payment_info_section"]["iban"]}</Iban>
+      <Amount>{info_dict["amounts_section"]["amount_total_tax"]}</Amount>
+      <Currency>{(info_dict["amounts_section"]["currency"]).upper()}</Currency>
+      <Vendor>{info_dict["vendor_section"]["recipient_name"]}</Vendor>
+      <VendorAddress>{(info_dict["other_section"]["notes"]).replace(chr(10), " ")}</VendorAddress>
+      <Details>
+        '''
+
+    body = ''
+    for item in items:
+        body += f'''<Detail>
+          <Amount>{item["item_amount_total"]}</Amount>
+          <AccountId/>
+          <Quantity>{item["item_quantity"]}</Quantity>
+          <Notes>{item["item_description"]}</Notes>
+        </Detail>'''
+
+    footer = f'''
+    </Details>
+    </Payable>
+  </Invoices>
+</InvoiceRegisters>'''
+    final_xml = header + body + footer
+    print(final_xml)
+    f = open("test.xml", "w")
+    f.write(final_xml)
+    f.close()
 
 
 if __name__ == '__main__':
