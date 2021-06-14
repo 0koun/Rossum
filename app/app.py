@@ -47,25 +47,6 @@ def download_data(annotation_id):
 
     return response.content
 
-def send_data():
-    username = ""
-    password = ""
-    queue_id = 12345
-    path = "test.xml"
-
-    url = "https://my-little-endpoint.ok/rossum" % str(queue_id)
-    with open(path, "rb") as f:
-        response = requests.post(
-            url,
-            files={"content": f},
-            auth=(username, password),
-        )
-    annotation_url = response.json()["results"][0]["annotation"]
-    if not response.ok:
-        print("cant send")
-    print("file send")
-    print("The file is reachable at the following URL:", annotation_url)
-
 def xml_separate_data(xml_data):
     info_dict = {}
     items = []
@@ -129,6 +110,25 @@ def xml_template(info_dict, items):
     f = open("test.xml", "w")
     f.write(final_xml)
     f.close()
+
+def send_data():
+    username = ""
+    password = ""
+    queue_id = 12345
+    path = "test.xml"
+
+    url = "https://my-little-endpoint.ok/rossum" % str(queue_id)
+    with open(path, "rb") as f:
+        response = requests.post(
+            url,
+            files={"content": f},
+            auth=(username, password),
+        )
+    annotation_url = response.json()["results"][0]["annotation"]
+    if not response.ok:
+        print("cant send")
+    print("file send")
+    print("The file is reachable at the following URL:", annotation_url)
 
 
 if __name__ == '__main__':
