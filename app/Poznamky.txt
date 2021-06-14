@@ -1,0 +1,44 @@
+Dobrý den,
+
+Tento týden jsem neměl moc volného času a aplikace by se dala ještě jistě vylepšit. Některé věci jsem si musel oživit, protože jsem je od školy neviděl a doučit.
+Určitě bych si musel ještě pohrát webovým rozhraním aplikace rossum, protože mi nedochází pár věcí ohledně „queues“.
+Pokud by bylo třeba tak tento úkol přepracuji.
+
+Popis jednotlivých částí kódu
+
+app
+	Flask() aplikace
+
+home()
+	Funkce ve které jsou poskládány ostatní funkce
+	aplikace očekává zadání čísla „annotation“ přes webové rozhraní
+	nejdříve stáhne data pomocí „download_data()“
+	poté vyndá data z xml formátu pomocí „xml_separate_data()“
+	data vloží do požadovaného formátu pomocí šablony v „xml_template“
+	odešle data pomocí funkce „send_data()“
+	funkce vrací „index.html“ ze složky „templates“
+
+download_data()
+	funkce načte požadované přístupové hodnoty z enviromentálních proměnných
+	vytvoří request
+	ověří request
+	vrátí xml data
+
+xml_separate_data()
+	funkce rozebere xml data
+	unikátní data jsou vložena do slovníku
+	data která nejsou unikátní (nákupní seznam) jsou uloženy do pole které obsahuje slovník 	jednotlivých položek
+
+xml_template()
+	data jsou vložena do šablony
+	data nákupu jsou generována cyklem pro škálovatelnost
+	data jsou složena do jednotné šablony
+	je vytvořen xml soubor
+
+send_data()
+	obsah xml souboru je odeslán na adresu
+	je testována response pro ověření zda odeslání bylo úspěšné
+
+
+app.run()
+	spuštění app
